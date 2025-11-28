@@ -22,38 +22,44 @@ export function useVehicleWebSocket() {
       return;
     }
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
-    const ws = new WebSocket(wsUrl);
+    try {
+      const wsUrl = window.location.origin
+        .replace(/^http:/, "ws:")
+        .replace(/^https:/, "wss:") + "/ws";
+      
+      const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-    };
+      ws.onopen = () => {
+        console.log("WebSocket connected to", wsUrl);
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const message: unknown = JSON.parse(event.data);
-        
-        if (isValidVehicleMessage(message)) {
-          queryClient.setQueryData(["/api/vehicles"], message.data);
+      ws.onmessage = (event) => {
+        try {
+          const message: unknown = JSON.parse(event.data);
+          
+          if (isValidVehicleMessage(message)) {
+            queryClient.setQueryData(["/api/vehicles"], message.data);
+          }
+        } catch (error) {
+          console.error("Failed to parse WebSocket message:", error);
         }
-      } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
-      }
-    };
+      };
 
-    ws.onclose = () => {
-      console.log("WebSocket disconnected, reconnecting in 3s...");
+      ws.onclose = () => {
+        console.log("WebSocket disconnected, reconnecting in 3s...");
+        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        ws.close();
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error("Failed to create WebSocket:", error);
       reconnectTimeoutRef.current = setTimeout(connect, 3000);
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      ws.close();
-    };
-
-    wsRef.current = ws;
+    }
   }, []);
 
   useEffect(() => {

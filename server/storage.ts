@@ -365,11 +365,11 @@ function generateSpeedViolations(startDate: string, endDate: string): SpeedViola
   const end = new Date(endDate);
   
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dailyViolations = Math.floor(Math.random() * 8);
+    const dailyViolations = 5 + Math.floor(Math.random() * 12);
     
     for (let i = 0; i < dailyViolations; i++) {
       const vehicle = sampleVehicles[Math.floor(Math.random() * sampleVehicles.length)];
-      const speed = vehicle.speedLimit + 10 + Math.floor(Math.random() * 30);
+      const speed = vehicle.speedLimit + 8 + Math.floor(Math.random() * 35);
       
       violations.push({
         id: randomUUID(),
@@ -381,7 +381,7 @@ function generateSpeedViolations(startDate: string, endDate: string): SpeedViola
         timestamp: new Date(d.getTime() + Math.random() * 86400000).toISOString(),
         latitude: -23.5 + Math.random() * 0.1,
         longitude: -46.6 + Math.random() * 0.1,
-        duration: 10 + Math.floor(Math.random() * 60),
+        duration: 15 + Math.floor(Math.random() * 90),
       });
     }
   }
