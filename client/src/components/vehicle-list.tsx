@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Search, Truck, MapPin, Gauge, AlertTriangle, Signal, SignalZero } from "lucide-react";
+import { Search, Truck, MapPin, Gauge, AlertTriangle, Signal, SignalZero, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Vehicle } from "@shared/schema";
 
@@ -12,10 +13,11 @@ interface VehicleListProps {
   vehicles: Vehicle[];
   selectedVehicleId?: string;
   onSelectVehicle: (vehicle: Vehicle) => void;
+  onAddVehicle?: () => void;
   isLoading?: boolean;
 }
 
-export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, isLoading }: VehicleListProps) {
+export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, onAddVehicle, isLoading }: VehicleListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
@@ -98,6 +100,20 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, isLo
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 space-y-4 border-b border-sidebar-border">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-lg">Veículos</h2>
+          {onAddVehicle && (
+            <Button
+              size="sm"
+              onClick={onAddVehicle}
+              className="gap-1"
+              data-testid="button-add-vehicle"
+            >
+              <Plus className="h-4 w-4" />
+              Novo
+            </Button>
+          )}
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

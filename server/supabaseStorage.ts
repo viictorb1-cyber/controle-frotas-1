@@ -245,7 +245,18 @@ export class SupabaseStorage implements IStorage {
   }
 
   async deleteVehicle(id: string): Promise<boolean> {
-    const { error, count } = await supabase!
+    // Primeiro verifica se o veículo existe
+    const { data: existing } = await supabase!
+      .from('vehicles')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return false;
+    }
+
+    const { error } = await supabase!
       .from('vehicles')
       .delete()
       .eq('id', id);
@@ -255,7 +266,7 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
 
-    return (count || 0) > 0;
+    return true;
   }
 
   // ==================== GEOFENCES ====================
@@ -339,7 +350,18 @@ export class SupabaseStorage implements IStorage {
   }
 
   async deleteGeofence(id: string): Promise<boolean> {
-    const { error, count } = await supabase!
+    // Primeiro verifica se o geofence existe
+    const { data: existing } = await supabase!
+      .from('geofences')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) {
+      return false;
+    }
+
+    const { error } = await supabase!
       .from('geofences')
       .delete()
       .eq('id', id);
@@ -349,7 +371,7 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
 
-    return (count || 0) > 0;
+    return true;
   }
 
   // ==================== ALERTS ====================

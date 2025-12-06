@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { 
   X, MapPin, Gauge, Navigation, Radio, Battery, Clock, 
-  History, Shield, AlertTriangle, Bell, Activity, Settings
+  History, Shield, AlertTriangle, Bell, Activity, Settings,
+  Pencil, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,9 +20,11 @@ interface VehicleDetailPanelProps {
   onClose: () => void;
   onFollowVehicle: () => void;
   isFollowing: boolean;
+  onEditVehicle?: (vehicle: Vehicle) => void;
+  onDeleteVehicle?: (vehicle: Vehicle) => void;
 }
 
-export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, isFollowing }: VehicleDetailPanelProps) {
+export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, isFollowing, onEditVehicle, onDeleteVehicle }: VehicleDetailPanelProps) {
   const vehicleAlerts = alerts.filter(a => a.vehicleId === vehicle.id);
   const unreadAlerts = vehicleAlerts.filter(a => !a.read);
 
@@ -212,6 +215,33 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
               <Settings className="h-4 w-4" />
               Definir limite de velocidade
             </Button>
+
+            <Separator className="my-2" />
+
+            <div className="flex gap-2">
+              {onEditVehicle && (
+                <Button 
+                  variant="outline" 
+                  className="flex-1 justify-center gap-2" 
+                  onClick={() => onEditVehicle(vehicle)}
+                  data-testid="button-edit-vehicle"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
+              )}
+              {onDeleteVehicle && (
+                <Button 
+                  variant="destructive" 
+                  className="flex-1 justify-center gap-2" 
+                  onClick={() => onDeleteVehicle(vehicle)}
+                  data-testid="button-delete-vehicle"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+              )}
+            </div>
           </div>
         </TabsContent>
 
