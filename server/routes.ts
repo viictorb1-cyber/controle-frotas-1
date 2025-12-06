@@ -23,7 +23,11 @@ export async function registerRoutes(
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
-  storage.onVehicleUpdate(broadcastVehicles);
+  // onVehicleUpdate só existe no MemStorage (para simulação local)
+  // SupabaseStorage usa Realtime para atualizações
+  if ('onVehicleUpdate' in storage && typeof (storage as any).onVehicleUpdate === 'function') {
+    (storage as any).onVehicleUpdate(broadcastVehicles);
+  }
 
   wss.on("connection", (ws) => {
     clients.add(ws);
@@ -129,9 +133,11 @@ export async function registerRoutes(
 
   app.post("/api/geofences", async (req, res) => {
     try {
+      console.log("Criando geofence:", JSON.stringify(req.body, null, 2));
       const geofence = await storage.createGeofence(req.body);
       res.status(201).json(geofence);
     } catch (error) {
+      console.error("Erro ao criar geofence:", error);
       res.status(500).json({ error: "Failed to create geofence" });
     }
   });

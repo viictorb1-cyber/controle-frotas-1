@@ -87,7 +87,7 @@ function Navigation() {
   );
 }
 
-function Router() {
+function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -108,7 +108,7 @@ function App() {
           <div className="flex flex-col h-screen">
             <Navigation />
             <main className="flex-1 overflow-hidden">
-              <Router />
+              <AppRouter />
             </main>
           </div>
           <Toaster />

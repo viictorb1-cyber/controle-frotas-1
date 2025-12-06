@@ -5,6 +5,8 @@ import type {
   Alert, InsertAlert,
   Trip, SpeedViolation, VehicleStats
 } from "@shared/schema";
+import { isSupabaseConfigured } from "./lib/supabase";
+import { SupabaseStorage } from "./supabaseStorage";
 
 export interface IStorage {
   getVehicles(): Promise<Vehicle[]>;
@@ -608,4 +610,19 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Factory function para criar o storage apropriado
+function createStorage(): IStorage {
+  if (isSupabaseConfigured()) {
+    console.log('Usando SupabaseStorage para persistência de dados');
+    return new SupabaseStorage();
+  }
+  
+  console.log('Supabase não configurado. Usando MemStorage (dados em memória)');
+  return new MemStorage();
+}
+
+// Storage singleton - pode ser MemStorage ou SupabaseStorage dependendo da configuração
+export const storage = createStorage();
+
+// Re-exporta SupabaseStorage para uso direto quando necessário
+export { SupabaseStorage };
