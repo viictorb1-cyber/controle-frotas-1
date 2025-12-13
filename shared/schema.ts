@@ -177,3 +177,13 @@ export const insertUserSchema = z.object({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = { id: string; username: string; password: string };
+
+// Schema para dados de rastreamento recebidos por dispositivos GPS
+export const trackingDataSchema = z.object({
+  licensePlate: z.string().min(1, "Placa é obrigatória"),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  currentSpeed: z.number().min(0),
+});
+
+export type TrackingData = z.infer<typeof trackingDataSchema>;

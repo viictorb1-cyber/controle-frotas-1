@@ -8,9 +8,37 @@ import type {
 import { isSupabaseConfigured } from "./lib/supabase";
 import { SupabaseStorage } from "./supabaseStorage";
 
+export interface TrackingPoint {
+  vehicleId: string;
+  licensePlate: string;
+  latitude: number;
+  longitude: number;
+  speed: number;
+  heading?: number;
+  accuracy?: number;
+  status?: string;
+  ignition?: string;
+  batteryLevel?: number;
+  source?: string;
+}
+
+export interface TrackingHistoryRecord {
+  id: string;
+  vehicleId: string;
+  licensePlate: string;
+  latitude: number;
+  longitude: number;
+  speed: number;
+  heading: number;
+  status: string;
+  ignition: string;
+  recordedAt: string;
+}
+
 export interface IStorage {
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
+  getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<boolean>;
@@ -32,6 +60,10 @@ export interface IStorage {
   
   getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]>;
   getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats>;
+  
+  // Tracking History
+  saveTrackingPoint(data: TrackingPoint): Promise<{ id: string }>;
+  getTrackingHistory(vehicleId: string, startDate: string, endDate: string, limit?: number): Promise<TrackingHistoryRecord[]>;
 }
 
 const sampleVehicles: Vehicle[] = [
@@ -506,6 +538,12 @@ export class MemStorage implements IStorage {
     return this.vehicles.get(id);
   }
 
+  async getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined> {
+    return Array.from(this.vehicles.values()).find(
+      v => v.licensePlate.toLowerCase() === licensePlate.toLowerCase()
+    );
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const id = randomUUID();
     const newVehicle: Vehicle = { ...vehicle, id };
@@ -607,6 +645,18 @@ export class MemStorage implements IStorage {
 
   async getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats> {
     return generateSpeedStats(startDate, endDate);
+  }
+
+  async saveTrackingPoint(data: TrackingPoint): Promise<{ id: string }> {
+    // MemStorage não persiste o histórico (apenas em memória)
+    const id = randomUUID();
+    console.log(`[MemStorage] Tracking point saved (in-memory): ${id}`);
+    return { id };
+  }
+
+  async getTrackingHistory(vehicleId: string, startDate: string, endDate: string, limit: number = 1000): Promise<TrackingHistoryRecord[]> {
+    // MemStorage não tem histórico persistido
+    return [];
   }
 }
 

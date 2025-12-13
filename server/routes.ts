@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema } from "@shared/schema";
+import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema, trackingDataSchema } from "@shared/schema";
 
 const clients = new Set<WebSocket>();
 
@@ -107,6 +107,91 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete vehicle" });
+    }
+  });
+
+  // Endpoint de rastreamento GPS - recebe dados de posição de veículos
+  app.post("/api/tracking", async (req, res) => {
+    try {
+      const parsed = trackingDataSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Dados de rastreamento inválidos", 
+          details: parsed.error.errors 
+        });
+      }
+
+      const { licensePlate, latitude, longitude, currentSpeed } = parsed.data;
+      
+      // Determina o status baseado na velocidade
+      const status = currentSpeed > 5 ? "moving" : currentSpeed > 0 ? "idle" : "stopped";
+      const ignition = currentSpeed > 0 ? "on" : "off";
+      const lastUpdate = new Date().toISOString();
+
+      // Busca o veículo pela placa
+      let vehicle = await storage.getVehicleByLicensePlate(licensePlate);
+      let action: "created" | "updated" = "updated";
+
+      if (vehicle) {
+        // Atualiza o veículo existente
+        vehicle = await storage.updateVehicle(vehicle.id, {
+          latitude,
+          longitude,
+          currentSpeed,
+          status,
+          ignition,
+          lastUpdate,
+        });
+      } else {
+        // Cria um novo veículo com dados básicos
+        vehicle = await storage.createVehicle({
+          name: `Veículo ${licensePlate}`,
+          licensePlate,
+          status,
+          ignition,
+          currentSpeed,
+          speedLimit: 80,
+          heading: 0,
+          latitude,
+          longitude,
+          accuracy: 5,
+          lastUpdate,
+        });
+        action = "created";
+      }
+
+      // Salvar no histórico de rastreamento
+      let trackingId: string | null = null;
+      if (vehicle) {
+        try {
+          const trackingResult = await storage.saveTrackingPoint({
+            vehicleId: vehicle.id,
+            licensePlate,
+            latitude,
+            longitude,
+            speed: currentSpeed,
+            heading: 0,
+            accuracy: 5,
+            status,
+            ignition,
+            source: "mobile_app",
+          });
+          trackingId = trackingResult.id;
+        } catch (trackingError) {
+          // Log do erro mas não falha a requisição
+          console.error("Erro ao salvar histórico de rastreamento:", trackingError);
+        }
+      }
+
+      return res.status(action === "created" ? 201 : 200).json({
+        success: true,
+        action,
+        vehicle,
+        trackingId,
+      });
+    } catch (error) {
+      console.error("Erro no endpoint de rastreamento:", error);
+      res.status(500).json({ error: "Falha ao processar dados de rastreamento" });
     }
   });
 
@@ -226,9 +311,43 @@ export async function registerRoutes(
     }
   });
 
+  // Endpoint para consultar histórico de rastreamento
+  app.get("/api/tracking/history", async (req, res) => {
+    try {
+      const { vehicleId, startDate, endDate, limit } = req.query;
+      
+      if (!vehicleId || typeof vehicleId !== "string") {
+        return res.status(400).json({ error: "Vehicle ID is required" });
+      }
+      
+      const start = startDate ? String(startDate) : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const end = endDate ? String(endDate) : new Date().toISOString();
+      const limitNum = limit ? parseInt(String(limit), 10) : 1000;
+      
+      const history = await storage.getTrackingHistory(vehicleId, start, end, limitNum);
+      
+      res.json({
+        success: true,
+        count: history.length,
+        data: history,
+      });
+    } catch (error) {
+      console.error("Erro ao buscar histórico de rastreamento:", error);
+      res.status(500).json({ error: "Failed to fetch tracking history" });
+    }
+  });
+
   app.get("/api/trips", async (req, res) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:GET /api/trips',message:'Request recebido em /api/trips',data:{query:req.query,url:req.url,params:req.params},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     try {
       const { vehicleId, startDate, endDate } = req.query;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:GET /api/trips:params',message:'Query params extraídos',data:{vehicleId,startDate,endDate,hasVehicleId:!!vehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       if (!vehicleId || typeof vehicleId !== "string") {
         return res.status(400).json({ error: "Vehicle ID is required" });
@@ -238,8 +357,16 @@ export async function registerRoutes(
       const end = endDate ? String(endDate) : new Date().toISOString();
       
       const trips = await storage.getTrips(vehicleId, start, end);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:GET /api/trips:result',message:'Resultado do getTrips',data:{tripsCount:trips.length,vehicleId,start,end},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      
       res.json(trips);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:GET /api/trips:catch',message:'Erro no endpoint trips',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       res.status(500).json({ error: "Failed to fetch trips" });
     }
   });

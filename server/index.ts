@@ -88,5 +88,8 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.ts:startup',message:'Servidor iniciado',data:{port},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'INIT'})}).catch(()=>{});
+    // #endregion
   });
 })();

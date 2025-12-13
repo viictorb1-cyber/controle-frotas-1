@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Controle Frotas Mobile",
+    "slug": "controle-frotas-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "controle-frotas",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.controlefrotas.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Este aplicativo precisa acessar sua localização para rastrear a posição do veículo.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Este aplicativo precisa acessar sua localização em segundo plano para manter o rastreamento ativo.",
+        "NSLocationAlwaysUsageDescription": "Este aplicativo precisa acessar sua localização em segundo plano para manter o rastreamento ativo.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.controlefrotas.mobile",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização para rastreamento do veículo.",
+          "locationAlwaysPermission": "Permitir que $(PRODUCT_NAME) use sua localização em segundo plano.",
+          "locationWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
+

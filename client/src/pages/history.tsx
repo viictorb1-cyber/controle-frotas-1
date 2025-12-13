@@ -44,6 +44,10 @@ const stopIcon = L.divIcon({
 });
 
 export default function History() {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:component',message:'History component renderizou',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'INIT'})}).catch(()=>{});
+  // #endregion
+
   const searchParams = new URLSearchParams(useSearch());
   const vehicleIdParam = searchParams.get("vehicleId");
 
@@ -54,14 +58,85 @@ export default function History() {
   });
   const [selectedEvent, setSelectedEvent] = useState<RouteEvent | null>(null);
 
+  // Estabilizar as datas para evitar re-renders infinitos
+  const startDateString = useMemo(() => {
+    try {
+      return dateRange.from.toISOString();
+    } catch (error) {
+      console.error('Erro ao converter startDate:', error);
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:useMemo:startDate',message:'ERRO ao converter data',data:{error:String(error),dateFrom:dateRange.from},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11',runId:'post-fix'})}).catch(()=>{});
+      return new Date().toISOString();
+    }
+  }, [dateRange.from.getTime()]);
+  
+  const endDateString = useMemo(() => {
+    try {
+      return dateRange.to.toISOString();
+    } catch (error) {
+      console.error('Erro ao converter endDate:', error);
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:useMemo:endDate',message:'ERRO ao converter data',data:{error:String(error),dateTo:dateRange.to},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11',runId:'post-fix'})}).catch(()=>{});
+      return new Date().toISOString();
+    }
+  }, [dateRange.to.getTime()]);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:state',message:'Estados inicializados',data:{selectedVehicleId,dateRange:{from:startDateString,to:endDateString}},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5',runId:'post-fix'})}).catch(()=>{});
+  // #endregion
+
   const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({
     queryKey: ["/api/vehicles"],
   });
 
-  const { data: trips = [], isLoading: isLoadingTrips } = useQuery<Trip[]>({
-    queryKey: ["/api/trips", selectedVehicleId, dateRange.from.toISOString(), dateRange.to.toISOString()],
-    enabled: !!selectedVehicleId,
+  // #region agent log
+  if (selectedVehicleId) {
+    const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:selectedVehicle',message:'Veículo selecionado - RENDER',data:{selectedVehicleId,vehicleName:selectedVehicle?.name,licensePlate:selectedVehicle?.licensePlate,dateFrom:startDateString,dateTo:endDateString,renderCount:Date.now()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6',runId:'post-fix'})}).catch(()=>{});
+  }
+  // #endregion
+
+  // #region agent log
+  const tripsQueryUrl = selectedVehicleId 
+    ? `/api/trips?vehicleId=${selectedVehicleId}&startDate=${startDateString}&endDate=${endDateString}`
+    : null;
+  // #endregion
+
+  const { data: trips = [], isLoading: isLoadingTrips, error: tripsError } = useQuery<Trip[]>({
+    queryKey: ["trips", selectedVehicleId, startDateString, endDateString],
+    queryFn: async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:queryFn',message:'Iniciando fetch trips',data:{url:tripsQueryUrl,vehicleId:selectedVehicleId,from:startDateString,to:endDateString},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H7',runId:'post-fix'})}).catch(()=>{});
+      // #endregion
+      
+      const res = await fetch(tripsQueryUrl!);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:queryFn:response',message:'Resposta do fetch trips',data:{status:res.status,ok:res.ok,url:tripsQueryUrl},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H7',runId:'post-fix'})}).catch(()=>{});
+      // #endregion
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:queryFn:error',message:'Erro no fetch trips',data:{status:res.status,errorText,vehicleId:selectedVehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H10',runId:'post-fix'})}).catch(()=>{});
+        // #endregion
+        throw new Error(`${res.status}: ${errorText}`);
+      }
+      
+      const data = await res.json();
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:queryFn:data',message:'Dados recebidos do trips',data:{tripsCount:data?.length,hasData:!!data,firstTrip:data?.[0]?.id,vehicleId:selectedVehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H7',runId:'post-fix'})}).catch(()=>{});
+      // #endregion
+      
+      return data;
+    },
+    enabled: !!selectedVehicleId && !!tripsQueryUrl,
   });
+
+  // #region agent log
+  if (selectedVehicleId) {
+    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:queryState',message:'Estado da query de trips',data:{isLoadingTrips,hasTrips:trips.length > 0,tripsCount:trips.length,hasError:!!tripsError,errorMessage:tripsError?.message,vehicleId:selectedVehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9',runId:'post-fix'})}).catch(()=>{});
+  }
+  // #endregion
 
   const selectedTrip = trips[0];
 
@@ -146,20 +221,56 @@ export default function History() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2" data-testid="button-date-range">
+                <Button 
+                  variant="outline" 
+                  className="gap-2" 
+                  data-testid="button-date-range"
+                  onClick={(e) => {
+                    console.log('[DEBUG] Botão de data CLICADO', { selectedVehicleId, e });
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:PopoverTrigger:onClick',message:'Botão de data clicado',data:{dateRange:{from:startDateString,to:endDateString},selectedVehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-H2',runId:'post-fix'})}).catch(()=>{});
+                    // #endregion
+                  }}
+                >
                   <CalendarIcon className="h-4 w-4" />
                   {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent 
+                className="w-auto p-4" 
+                align="start"
+                onOpenAutoFocus={(e) => {
+                  console.log('[DEBUG] PopoverContent ABRIU!');
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:PopoverContent:onOpenAutoFocus',message:'PopoverContent abriu',data:{selectedVehicleId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3',runId:'post-fix'})}).catch(()=>{});
+                  // #endregion
+                }}
+              >
                 <Calendar
                   mode="range"
+                  defaultMonth={dateRange.from}
                   selected={{ from: dateRange.from, to: dateRange.to }}
                   onSelect={(range) => {
-                    if (range?.from && range?.to) {
-                      setDateRange({ from: range.from, to: range.to });
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:Calendar:onSelect',message:'Data selecionada',data:{range:range ? {from:range.from?.toISOString(),to:range.to?.toISOString()} : null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4',runId:'post-fix'})}).catch(()=>{});
+                    // #endregion
+                    if (range?.from) {
+                      // Se só from foi selecionado, define o mesmo dia para to
+                      if (!range.to) {
+                        setDateRange({ 
+                          from: startOfDay(range.from), 
+                          to: endOfDay(range.from) 
+                        });
+                      } else {
+                        // Se ambos foram selecionados
+                        setDateRange({ 
+                          from: startOfDay(range.from), 
+                          to: endOfDay(range.to) 
+                        });
+                      }
                     }
                   }}
+                  numberOfMonths={2}
                   locale={ptBR}
                 />
               </PopoverContent>

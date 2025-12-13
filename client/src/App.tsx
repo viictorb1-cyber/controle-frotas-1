@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  Map, History, Shield, Bell, BarChart3, Truck
+  Map, History, Shield, Bell, BarChart3, Car
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,8 +43,8 @@ function Navigation() {
   return (
     <header className="h-16 border-b border-border bg-card flex items-center px-6 gap-6 sticky top-0 z-50">
       <Link href="/" className="flex items-center gap-2">
-        <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
-          <Truck className="h-5 w-5 text-primary-foreground" />
+        <div className="h-9 w-9 rounded-md bg-red-500 flex items-center justify-center">
+          <Car className="h-5 w-5 text-white" />
         </div>
         <span className="font-semibold text-lg hidden md:block">FleetTrack</span>
       </Link>

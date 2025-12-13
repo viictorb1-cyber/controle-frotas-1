@@ -99,7 +99,7 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, onAd
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 space-y-4 border-b border-sidebar-border">
+      <div className="p-4 space-y-4 border-b border-sidebar-border bg-green-100 dark:bg-blue-900">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold text-lg">Veículos</h2>
           {onAddVehicle && (
@@ -179,7 +179,7 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, onAd
                     
                     <div className="text-xs text-muted-foreground mb-2">{vehicle.licensePlate}</div>
                     
-                    <div className="flex items-center gap-4 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
                       <div className="flex items-center gap-1">
                         <Gauge className="h-3 w-3" />
                         <span className={cn(
@@ -198,12 +198,12 @@ export function VehicleList({ vehicles, selectedVehicleId, onSelectVehicle, onAd
                         )}
                         <span>{formatTime(vehicle.lastUpdate)}</span>
                       </div>
+
+                      <Badge variant="secondary" className="text-[11px] px-2 py-0.5 whitespace-nowrap">
+                        {getStatusLabel(vehicle.status)}
+                      </Badge>
                     </div>
                   </div>
-                  
-                  <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                    {getStatusLabel(vehicle.status)}
-                  </Badge>
                 </div>
               </button>
             ))

@@ -194,6 +194,22 @@ export class SupabaseStorage implements IStorage {
     return data ? mapVehicleFromDb(data) : undefined;
   }
 
+  async getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined> {
+    const { data, error } = await supabase!
+      .from('vehicles')
+      .select('*')
+      .ilike('license_plate', licensePlate)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return undefined;
+      console.error('Erro ao buscar veículo por placa:', error);
+      throw error;
+    }
+
+    return data ? mapVehicleFromDb(data) : undefined;
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const { data, error } = await supabase!
       .from('vehicles')
@@ -480,6 +496,7 @@ export class SupabaseStorage implements IStorage {
   // ==================== TRIPS ====================
 
   async getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]> {
+    // Primeiro tenta buscar trips já processados
     const { data, error } = await supabase!
       .from('trips')
       .select('*')
@@ -493,7 +510,35 @@ export class SupabaseStorage implements IStorage {
       throw error;
     }
 
-    return (data || []).map(mapTripFromDb);
+    // Se existem trips processados, retorna eles
+    if (data && data.length > 0) {
+      return data.map(mapTripFromDb);
+    }
+
+    // Se não existem trips, processa o histórico de rastreamento
+    console.log(`Nenhum trip encontrado, processando histórico de rastreamento para veículo ${vehicleId}`);
+    
+    try {
+      const trackingHistory = await this.getTrackingHistory(vehicleId, startDate, endDate, 5000);
+      
+      if (trackingHistory.length === 0) {
+        console.log('Nenhum ponto de rastreamento encontrado para o período');
+        return [];
+      }
+
+      console.log(`Processando ${trackingHistory.length} pontos de rastreamento em trips`);
+      
+      // Importa dinamicamente o processador de trips
+      const { processTrackingPointsIntoTrips } = await import('./tripProcessor');
+      const trips = processTrackingPointsIntoTrips(trackingHistory);
+      
+      console.log(`${trips.length} trip(s) gerado(s) a partir do histórico`);
+      
+      return trips;
+    } catch (processingError) {
+      console.error('Erro ao processar histórico em trips:', processingError);
+      return [];
+    }
   }
 
   // ==================== SPEED VIOLATIONS ====================
@@ -570,5 +615,91 @@ export class SupabaseStorage implements IStorage {
         .sort((a, b) => a.date.localeCompare(b.date)),
       topViolators,
     };
+  }
+
+  // ==================== TRACKING HISTORY ====================
+
+  async saveTrackingPoint(data: {
+    vehicleId: string;
+    licensePlate: string;
+    latitude: number;
+    longitude: number;
+    speed: number;
+    heading?: number;
+    accuracy?: number;
+    status?: string;
+    ignition?: string;
+    batteryLevel?: number;
+    source?: string;
+  }): Promise<{ id: string }> {
+    const { data: result, error } = await supabase!
+      .from('tracking_history')
+      .insert({
+        vehicle_id: data.vehicleId,
+        license_plate: data.licensePlate,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        speed: data.speed,
+        heading: data.heading || 0,
+        accuracy: data.accuracy || 5,
+        status: data.status || (data.speed > 5 ? 'moving' : data.speed > 0 ? 'idle' : 'stopped'),
+        ignition: data.ignition || (data.speed > 0 ? 'on' : 'off'),
+        battery_level: data.batteryLevel || null,
+        source: data.source || 'mobile_app',
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Erro ao salvar ponto de rastreamento:', error);
+      throw error;
+    }
+
+    return { id: result.id };
+  }
+
+  async getTrackingHistory(
+    vehicleId: string, 
+    startDate: string, 
+    endDate: string,
+    limit: number = 1000
+  ): Promise<Array<{
+    id: string;
+    vehicleId: string;
+    licensePlate: string;
+    latitude: number;
+    longitude: number;
+    speed: number;
+    heading: number;
+    status: string;
+    ignition: string;
+    recordedAt: string;
+  }>> {
+    const { data, error } = await supabase!
+      .from('tracking_history')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .gte('recorded_at', startDate)
+      .lte('recorded_at', endDate)
+      .order('recorded_at', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Erro ao buscar histórico de rastreamento:', error);
+      throw error;
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      licensePlate: row.license_plate,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      speed: Number(row.speed),
+      heading: Number(row.heading || 0),
+      status: row.status,
+      ignition: row.ignition,
+      recordedAt: row.recorded_at,
+    }));
   }
 }
