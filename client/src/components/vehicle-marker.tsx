@@ -21,7 +21,7 @@ const createVehicleIcon = (heading: number, status: Vehicle["status"]) => {
     iconAnchor: [20, 20],
     popupAnchor: [0, -20],
   });
-};
+}; 
 
 interface VehicleMarkerProps {
   vehicle: Vehicle;
