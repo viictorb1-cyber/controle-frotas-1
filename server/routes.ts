@@ -20,35 +20,40 @@ function broadcastVehicles(vehicles: unknown[]) {
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
+  options?: { enableWebSocket?: boolean }
 ): Promise<Server> {
 
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  const enableWebSocket = options?.enableWebSocket !== false;
 
-  // onVehicleUpdate só existe no MemStorage (para simulação local)
-  // SupabaseStorage usa Realtime para atualizações
-  if ('onVehicleUpdate' in storage && typeof (storage as any).onVehicleUpdate === 'function') {
-    (storage as any).onVehicleUpdate(broadcastVehicles);
+  if (enableWebSocket) {
+    const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+
+    // onVehicleUpdate só existe no MemStorage (para simulação local)
+    // SupabaseStorage usa Realtime para atualizações
+    if ('onVehicleUpdate' in storage && typeof (storage as any).onVehicleUpdate === 'function') {
+      (storage as any).onVehicleUpdate(broadcastVehicles);
+    }
+
+    wss.on("connection", (ws) => {
+      clients.add(ws);
+      console.log("WebSocket client connected");
+
+      storage.getVehicles().then(vehicles => {
+        ws.send(JSON.stringify({ type: "vehicles", data: vehicles }));
+      });
+
+      ws.on("close", () => {
+        clients.delete(ws);
+        console.log("WebSocket client disconnected");
+      });
+
+      ws.on("error", (error) => {
+        console.error("WebSocket error:", error);
+        clients.delete(ws);
+      });
+    });
   }
-
-  wss.on("connection", (ws) => {
-    clients.add(ws);
-    console.log("WebSocket client connected");
-
-    storage.getVehicles().then(vehicles => {
-      ws.send(JSON.stringify({ type: "vehicles", data: vehicles }));
-    });
-
-    ws.on("close", () => {
-      clients.delete(ws);
-      console.log("WebSocket client disconnected");
-    });
-
-    ws.on("error", (error) => {
-      console.error("WebSocket error:", error);
-      clients.delete(ws);
-    });
-  });
 
   app.get("/api/vehicles", async (req, res) => {
     try {
