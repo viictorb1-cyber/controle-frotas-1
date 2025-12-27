@@ -83,8 +83,11 @@ export default function History() {
   fetch('http://127.0.0.1:7242/ingest/73b858fe-22a8-4099-b86a-2ffc8204c385',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'history.tsx:state',message:'Estados inicializados',data:{selectedVehicleId,dateRange:{from:startDateString,to:endDateString}},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5',runId:'post-fix'})}).catch(()=>{});
   // #endregion
 
-  const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({
+  const { data: vehicles = [], isLoading: isLoadingVehicles, error: vehiclesError } = useQuery<Vehicle[]>({
     queryKey: ["/api/vehicles"],
+    retry: 2, // Reduzir tentativas para evitar loop infinito
+    retryDelay: 3000, // Aguardar 3s entre tentativas
+    staleTime: 30000, // Considerar dados frescos por 30s
   });
 
   // #region agent log
@@ -129,7 +132,9 @@ export default function History() {
       
       return data;
     },
-    enabled: !!selectedVehicleId && !!tripsQueryUrl,
+    enabled: !!selectedVehicleId && !!tripsQueryUrl && !vehiclesError, // Não buscar trips se vehicles falhou
+    retry: 2,
+    retryDelay: 3000,
   });
 
   // #region agent log
@@ -203,6 +208,17 @@ export default function History() {
 
   return (
     <div className="flex h-full" data-testid="history-page">
+      {vehiclesError && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-destructive text-destructive-foreground px-4 py-3 rounded-lg shadow-lg max-w-md">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            <div>
+              <div className="font-semibold">Erro de Conexão</div>
+              <div className="text-sm">Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente.</div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex flex-col">
         <div className="p-4 border-b border-border bg-card">
           <div className="flex flex-wrap items-center gap-4">
