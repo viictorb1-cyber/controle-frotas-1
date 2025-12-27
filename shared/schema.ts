@@ -168,15 +168,24 @@ export const users = {
   id: "",
   username: "",
   password: "",
+  role: "", // "admin" or "user"
+  createdAt: "",
 };
 
 export const insertUserSchema = z.object({
-  username: z.string(),
-  password: z.string(),
+  username: z.string().min(3, "Nome de usuário deve ter pelo menos 3 caracteres"),
+  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  role: z.enum(["admin", "user"]).default("user"),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = { id: string; username: string; password: string };
+export type User = { 
+  id: string; 
+  username: string; 
+  password: string;
+  role: "admin" | "user";
+  createdAt: string;
+};
 
 // Schema para dados de rastreamento recebidos por dispositivos GPS
 export const trackingDataSchema = z.object({

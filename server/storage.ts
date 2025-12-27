@@ -1,12 +1,14 @@
 import { randomUUID } from "crypto";
-import type { 
+import type {
   Vehicle, InsertVehicle,
   Geofence, InsertGeofence,
   Alert, InsertAlert,
-  Trip, SpeedViolation, VehicleStats
+  Trip, SpeedViolation, VehicleStats,
+  User, InsertUser
 } from "@shared/schema";
 import { isSupabaseConfigured } from "./lib/supabase";
 import { SupabaseStorage } from "./supabaseStorage";
+import bcrypt from "bcrypt";
 
 export interface TrackingPoint {
   vehicleId: string;
@@ -64,6 +66,13 @@ export interface IStorage {
   // Tracking History
   saveTrackingPoint(data: TrackingPoint): Promise<{ id: string }>;
   getTrackingHistory(vehicleId: string, startDate: string, endDate: string, limit?: number): Promise<TrackingHistoryRecord[]>;
+  
+  // User Authentication
+  getUser(username: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
 }
 
 const sampleVehicles: Vehicle[] = [
@@ -217,6 +226,19 @@ const sampleGeofences: Geofence[] = [
     color: "#ef4444",
   },
 ];
+
+const sampleUsers: User[] = [
+  {
+    id: "admin-1",
+    username: "victor",
+    password: "$2b$10$PnEnju8rDmH0QtB5m7sDSOT1bIwusEHGkYv3b9D0ylATcoRcjH.zq", // hash de "mudar123"
+    role: "admin",
+    createdAt: new Date().toISOString(),
+  },
+];
+
+// Hash da senha "mudar123"
+const ADMIN_PASSWORD_HASH = "$2b$10$PnEnju8rDmH0QtB5m7sDSOT1bIwusEHGkYv3b9D0ylATcoRcjH.zq";
 
 const sampleAlerts: Alert[] = [
   {
@@ -482,6 +504,7 @@ export class MemStorage implements IStorage {
   private vehicles: Map<string, Vehicle>;
   private geofences: Map<string, Geofence>;
   private alerts: Map<string, Alert>;
+  private users: Map<string, User>;
   private simulationInterval: ReturnType<typeof setInterval> | null = null;
   private updateCallbacks: Set<VehicleUpdateCallback> = new Set();
 
@@ -489,6 +512,7 @@ export class MemStorage implements IStorage {
     this.vehicles = new Map(sampleVehicles.map(v => [v.id, v]));
     this.geofences = new Map(sampleGeofences.map(g => [g.id, g]));
     this.alerts = new Map(sampleAlerts.map(a => [a.id, a]));
+    this.users = new Map(sampleUsers.map(u => [u.id, u]));
     
     this.startSimulation();
   }
@@ -657,6 +681,37 @@ export class MemStorage implements IStorage {
   async getTrackingHistory(vehicleId: string, startDate: string, endDate: string, limit: number = 1000): Promise<TrackingHistoryRecord[]> {
     // MemStorage não tem histórico persistido
     return [];
+  }
+
+  // User Authentication methods
+  async getUser(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.username === username);
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const newUser: User = {
+      id,
+      username: user.username,
+      password: hashedPassword,
+      role: user.role || "user",
+      createdAt: new Date().toISOString(),
+    };
+    this.users.set(id, newUser);
+    return newUser;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
   }
 }
 

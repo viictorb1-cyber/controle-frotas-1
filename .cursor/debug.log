@@ -1,1 +1,2 @@
-{"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766857783994,"sessionId":"debug-session","hypothesisId":"INIT"}
+{"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766862794640,"sessionId":"debug-session","hypothesisId":"INIT"}
+{"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766862983556,"sessionId":"debug-session","hypothesisId":"INIT"}

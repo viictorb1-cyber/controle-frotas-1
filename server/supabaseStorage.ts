@@ -3,9 +3,11 @@ import type {
   Vehicle, InsertVehicle,
   Geofence, InsertGeofence,
   Alert, InsertAlert,
-  Trip, SpeedViolation, VehicleStats
+  Trip, SpeedViolation, VehicleStats,
+  User, InsertUser
 } from '@shared/schema';
 import type { IStorage } from './storage';
+import bcrypt from 'bcrypt';
 
 // Mapeia Vehicle do banco para o tipo da aplicação
 function mapVehicleFromDb(row: any): Vehicle {
@@ -55,12 +57,12 @@ function mapGeofenceFromDb(row: any): Geofence {
     description: row.description || undefined,
     type: row.type,
     active: row.active,
-    center: row.center || undefined,
-    radius: row.radius || undefined,
-    points: row.points || undefined,
-    rules: row.rules || [],
-    vehicleIds: row.vehicle_ids || [],
-    lastTriggered: row.last_triggered || undefined,
+    center: row.center,
+    radius: row.radius,
+    points: row.points,
+    rules: row.rules,
+    vehicleIds: row.vehicle_ids,
+    lastTriggered: row.last_triggered,
     color: row.color || undefined,
   };
 }
@@ -73,9 +75,9 @@ function mapGeofenceToDb(geofence: InsertGeofence & { id?: string }): any {
     description: geofence.description || null,
     type: geofence.type,
     active: geofence.active,
-    center: geofence.center || null,
-    radius: geofence.radius || null,
-    points: geofence.points || null,
+    center: geofence.center,
+    radius: geofence.radius,
+    points: geofence.points,
     rules: geofence.rules,
     vehicle_ids: geofence.vehicleIds,
     last_triggered: geofence.lastTriggered || null,
@@ -94,11 +96,11 @@ function mapAlertFromDb(row: any): Alert {
     message: row.message,
     timestamp: row.timestamp,
     read: row.read,
-    latitude: row.latitude || undefined,
-    longitude: row.longitude || undefined,
-    speed: row.speed || undefined,
-    speedLimit: row.speed_limit || undefined,
-    geofenceName: row.geofence_name || undefined,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    speed: row.speed,
+    speedLimit: row.speed_limit,
+    geofenceName: row.geofence_name,
   };
 }
 
@@ -121,24 +123,6 @@ function mapAlertToDb(alert: InsertAlert & { id?: string }): any {
   };
 }
 
-// Mapeia Trip do banco para o tipo da aplicação
-function mapTripFromDb(row: any): Trip {
-  return {
-    id: row.id,
-    vehicleId: row.vehicle_id,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    totalDistance: row.total_distance,
-    travelTime: row.travel_time,
-    stoppedTime: row.stopped_time,
-    averageSpeed: row.average_speed,
-    maxSpeed: row.max_speed,
-    stopsCount: row.stops_count,
-    points: row.points || [],
-    events: row.events || [],
-  };
-}
-
 // Mapeia SpeedViolation do banco para o tipo da aplicação
 function mapSpeedViolationFromDb(row: any): SpeedViolation {
   return {
@@ -156,19 +140,11 @@ function mapSpeedViolationFromDb(row: any): SpeedViolation {
 }
 
 export class SupabaseStorage implements IStorage {
-  constructor() {
-    if (!isSupabaseConfigured()) {
-      throw new Error('Supabase não está configurado. Verifique as variáveis de ambiente.');
-    }
-  }
-
-  // ==================== VEHICLES ====================
-
   async getVehicles(): Promise<Vehicle[]> {
     const { data, error } = await supabase!
       .from('vehicles')
       .select('*')
-      .order('name');
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar veículos:', error);
@@ -185,29 +161,25 @@ export class SupabaseStorage implements IStorage {
       .eq('id', id)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao buscar veículo:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapVehicleFromDb(data) : undefined;
+    return mapVehicleFromDb(data);
   }
 
   async getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined> {
     const { data, error } = await supabase!
       .from('vehicles')
       .select('*')
-      .ilike('license_plate', licensePlate)
+      .eq('license_plate', licensePlate)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao buscar veículo por placa:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapVehicleFromDb(data) : undefined;
+    return mapVehicleFromDb(data);
   }
 
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
@@ -226,52 +198,21 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined> {
-    const dbUpdates: Record<string, any> = {};
-    
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.licensePlate !== undefined) dbUpdates.license_plate = updates.licensePlate;
-    if (updates.model !== undefined) dbUpdates.model = updates.model;
-    if (updates.status !== undefined) dbUpdates.status = updates.status;
-    if (updates.ignition !== undefined) dbUpdates.ignition = updates.ignition;
-    if (updates.currentSpeed !== undefined) dbUpdates.current_speed = updates.currentSpeed;
-    if (updates.speedLimit !== undefined) dbUpdates.speed_limit = updates.speedLimit;
-    if (updates.heading !== undefined) dbUpdates.heading = updates.heading;
-    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
-    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
-    if (updates.accuracy !== undefined) dbUpdates.accuracy = updates.accuracy;
-    if (updates.lastUpdate !== undefined) dbUpdates.last_update = updates.lastUpdate;
-    if (updates.batteryLevel !== undefined) dbUpdates.battery_level = updates.batteryLevel;
-    
-    dbUpdates.updated_at = new Date().toISOString();
-
     const { data, error } = await supabase!
       .from('vehicles')
-      .update(dbUpdates)
+      .update(mapVehicleToDb(updates))
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao atualizar veículo:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapVehicleFromDb(data) : undefined;
+    return mapVehicleFromDb(data);
   }
 
   async deleteVehicle(id: string): Promise<boolean> {
-    // Primeiro verifica se o veículo existe
-    const { data: existing } = await supabase!
-      .from('vehicles')
-      .select('id')
-      .eq('id', id)
-      .single();
-
-    if (!existing) {
-      return false;
-    }
-
     const { error } = await supabase!
       .from('vehicles')
       .delete()
@@ -279,19 +220,17 @@ export class SupabaseStorage implements IStorage {
 
     if (error) {
       console.error('Erro ao deletar veículo:', error);
-      throw error;
+      return false;
     }
 
     return true;
   }
 
-  // ==================== GEOFENCES ====================
-
   async getGeofences(): Promise<Geofence[]> {
     const { data, error } = await supabase!
       .from('geofences')
       .select('*')
-      .order('name');
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Erro ao buscar geofences:', error);
@@ -308,13 +247,11 @@ export class SupabaseStorage implements IStorage {
       .eq('id', id)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao buscar geofence:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapGeofenceFromDb(data) : undefined;
+    return mapGeofenceFromDb(data);
   }
 
   async createGeofence(geofence: InsertGeofence): Promise<Geofence> {
@@ -333,50 +270,21 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateGeofence(id: string, updates: Partial<Geofence>): Promise<Geofence | undefined> {
-    const dbUpdates: Record<string, any> = {};
-    
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.description !== undefined) dbUpdates.description = updates.description;
-    if (updates.type !== undefined) dbUpdates.type = updates.type;
-    if (updates.active !== undefined) dbUpdates.active = updates.active;
-    if (updates.center !== undefined) dbUpdates.center = updates.center;
-    if (updates.radius !== undefined) dbUpdates.radius = updates.radius;
-    if (updates.points !== undefined) dbUpdates.points = updates.points;
-    if (updates.rules !== undefined) dbUpdates.rules = updates.rules;
-    if (updates.vehicleIds !== undefined) dbUpdates.vehicle_ids = updates.vehicleIds;
-    if (updates.lastTriggered !== undefined) dbUpdates.last_triggered = updates.lastTriggered;
-    if (updates.color !== undefined) dbUpdates.color = updates.color;
-    
-    dbUpdates.updated_at = new Date().toISOString();
-
     const { data, error } = await supabase!
       .from('geofences')
-      .update(dbUpdates)
+      .update(mapGeofenceToDb(updates))
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao atualizar geofence:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapGeofenceFromDb(data) : undefined;
+    return mapGeofenceFromDb(data);
   }
 
   async deleteGeofence(id: string): Promise<boolean> {
-    // Primeiro verifica se o geofence existe
-    const { data: existing } = await supabase!
-      .from('geofences')
-      .select('id')
-      .eq('id', id)
-      .single();
-
-    if (!existing) {
-      return false;
-    }
-
     const { error } = await supabase!
       .from('geofences')
       .delete()
@@ -384,13 +292,11 @@ export class SupabaseStorage implements IStorage {
 
     if (error) {
       console.error('Erro ao deletar geofence:', error);
-      throw error;
+      return false;
     }
 
     return true;
   }
-
-  // ==================== ALERTS ====================
 
   async getAlerts(): Promise<Alert[]> {
     const { data, error } = await supabase!
@@ -413,13 +319,11 @@ export class SupabaseStorage implements IStorage {
       .eq('id', id)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao buscar alerta:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapAlertFromDb(data) : undefined;
+    return mapAlertFromDb(data);
   }
 
   async createAlert(alert: InsertAlert): Promise<Alert> {
@@ -438,35 +342,18 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateAlert(id: string, updates: Partial<Alert>): Promise<Alert | undefined> {
-    const dbUpdates: Record<string, any> = {};
-    
-    if (updates.type !== undefined) dbUpdates.type = updates.type;
-    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
-    if (updates.vehicleId !== undefined) dbUpdates.vehicle_id = updates.vehicleId;
-    if (updates.vehicleName !== undefined) dbUpdates.vehicle_name = updates.vehicleName;
-    if (updates.message !== undefined) dbUpdates.message = updates.message;
-    if (updates.timestamp !== undefined) dbUpdates.timestamp = updates.timestamp;
-    if (updates.read !== undefined) dbUpdates.read = updates.read;
-    if (updates.latitude !== undefined) dbUpdates.latitude = updates.latitude;
-    if (updates.longitude !== undefined) dbUpdates.longitude = updates.longitude;
-    if (updates.speed !== undefined) dbUpdates.speed = updates.speed;
-    if (updates.speedLimit !== undefined) dbUpdates.speed_limit = updates.speedLimit;
-    if (updates.geofenceName !== undefined) dbUpdates.geofence_name = updates.geofenceName;
-
     const { data, error } = await supabase!
       .from('alerts')
-      .update(dbUpdates)
+      .update(mapAlertToDb(updates))
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return undefined;
-      console.error('Erro ao atualizar alerta:', error);
-      throw error;
+    if (error || !data) {
+      return undefined;
     }
 
-    return data ? mapAlertFromDb(data) : undefined;
+    return mapAlertFromDb(data);
   }
 
   async markAllAlertsRead(): Promise<void> {
@@ -493,10 +380,7 @@ export class SupabaseStorage implements IStorage {
     }
   }
 
-  // ==================== TRIPS ====================
-
   async getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]> {
-    // Primeiro tenta buscar trips já processados
     const { data, error } = await supabase!
       .from('trips')
       .select('*')
@@ -506,42 +390,25 @@ export class SupabaseStorage implements IStorage {
       .order('start_time', { ascending: false });
 
     if (error) {
-      console.error('Erro ao buscar viagens:', error);
+      console.error('Erro ao buscar trips:', error);
       throw error;
     }
 
-    // Se existem trips processados, retorna eles
-    if (data && data.length > 0) {
-      return data.map(mapTripFromDb);
-    }
-
-    // Se não existem trips, processa o histórico de rastreamento
-    console.log(`Nenhum trip encontrado, processando histórico de rastreamento para veículo ${vehicleId}`);
-    
-    try {
-      const trackingHistory = await this.getTrackingHistory(vehicleId, startDate, endDate, 5000);
-      
-      if (trackingHistory.length === 0) {
-        console.log('Nenhum ponto de rastreamento encontrado para o período');
-        return [];
-      }
-
-      console.log(`Processando ${trackingHistory.length} pontos de rastreamento em trips`);
-      
-      // Importa dinamicamente o processador de trips
-      const { processTrackingPointsIntoTrips } = await import('./tripProcessor');
-      const trips = processTrackingPointsIntoTrips(trackingHistory);
-      
-      console.log(`${trips.length} trip(s) gerado(s) a partir do histórico`);
-      
-      return trips;
-    } catch (processingError) {
-      console.error('Erro ao processar histórico em trips:', processingError);
-      return [];
-    }
+    return (data || []).map(row => ({
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      totalDistance: row.total_distance,
+      travelTime: row.travel_time,
+      stoppedTime: row.stopped_time,
+      averageSpeed: row.average_speed,
+      maxSpeed: row.max_speed,
+      stopsCount: row.stops_count,
+      points: row.points,
+      events: row.events,
+    }));
   }
-
-  // ==================== SPEED VIOLATIONS ====================
 
   async getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]> {
     const { data, error } = await supabase!
@@ -616,8 +483,6 @@ export class SupabaseStorage implements IStorage {
       topViolators,
     };
   }
-
-  // ==================== TRACKING HISTORY ====================
 
   async saveTrackingPoint(data: {
     vehicleId: string;
@@ -696,10 +561,113 @@ export class SupabaseStorage implements IStorage {
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
       speed: Number(row.speed),
-      heading: Number(row.heading || 0),
+      heading: Number(row.heading),
       status: row.status,
       ignition: row.ignition,
       recordedAt: row.recorded_at,
     }));
+  }
+
+  // User Authentication methods
+  async getUser(username: string): Promise<User | undefined> {
+    const { data, error } = await supabase!
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .single();
+
+    if (error || !data) {
+      return undefined;
+    }
+
+    return {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      role: data.role,
+      createdAt: data.created_at,
+    };
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const { data, error } = await supabase!
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      return undefined;
+    }
+
+    return {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      role: data.role,
+      createdAt: data.created_at,
+    };
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    
+    const { data, error } = await supabase!
+      .from('users')
+      .insert({
+        username: user.username,
+        password: hashedPassword,
+        role: user.role || 'user',
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao criar usuário:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      username: data.username,
+      password: data.password,
+      role: data.role,
+      createdAt: data.created_at,
+    };
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const { data, error } = await supabase!
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar usuários:', error);
+      throw error;
+    }
+
+    return (data || []).map(row => ({
+      id: row.id,
+      username: row.username,
+      password: row.password,
+      role: row.role,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const { error } = await supabase!
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Erro ao deletar usuário:', error);
+      return false;
+    }
+
+    return true;
   }
 }

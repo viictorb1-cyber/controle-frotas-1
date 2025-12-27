@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema, trackingDataSchema } from "@shared/schema";
+import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema, trackingDataSchema, insertUserSchema } from "@shared/schema";
+import bcrypt from "bcrypt";
+import express from "express";
 
 const clients = new Set<WebSocket>();
 
@@ -396,6 +398,94 @@ export async function registerRoutes(
       res.json(stats);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch speed stats" });
+    }
+  });
+
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Usuário e senha são obrigatórios" });
+      }
+
+      const user = await storage.getUser(username);
+      if (!user) {
+        return res.status(401).json({ error: "Usuário ou senha incorretos" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Usuário ou senha incorretos" });
+      }
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user;
+      
+      // In a real app, you would set up a session or JWT here
+      // For simplicity, we'll just return the user
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Erro ao fazer login" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    // In a real app, you would clear the session or invalidate JWT
+    res.json({ message: "Logout successful" });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    // In a real app, you would get user from session or JWT
+    // For simplicity, we'll return null (not authenticated)
+    res.status(401).json({ error: "Not authenticated" });
+  });
+
+  // User management routes
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password: _, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", async (req, res) => {
+    try {
+      const parsed = insertUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid user data", details: parsed.error.errors });
+      }
+
+      // Check if username already exists
+      const existingUser = await storage.getUser(parsed.data.username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Nome de usuário já existe" });
+      }
+
+      const user = await storage.createUser(parsed.data);
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Create user error:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteUser(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
