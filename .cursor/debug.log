@@ -1,2 +1,5 @@
 {"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766862794640,"sessionId":"debug-session","hypothesisId":"INIT"}
 {"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766862983556,"sessionId":"debug-session","hypothesisId":"INIT"}
+{"location":"server/index.ts:startup","message":"Servidor iniciado","data":{"port":5000},"timestamp":1766867492359,"sessionId":"debug-session","hypothesisId":"INIT"}
+{"location":"history.tsx:component","message":"History component renderizou","data":{},"timestamp":1766867517860,"sessionId":"debug-session","hypothesisId":"INIT"}
+{"location":"history.tsx:state","message":"Estados inicializados","data":{"selectedVehicleId":"","dateRange":{"from":"2025-12-27T04:00:00.000Z","to":"2025-12-28T03:59:59.999Z"}},"timestamp":1766867517861,"sessionId":"debug-session","hypothesisId":"H5","runId":"post-fix"}
